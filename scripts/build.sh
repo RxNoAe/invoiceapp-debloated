@@ -5,6 +5,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# apktool needs a generous heap on large apps (decode + smali + aapt2 link).
+export JAVA_OPTS="${JAVA_OPTS:--Xmx4g -XX:+UseSerialGC}"
+
 BASE="base/com.invoiceapp.apk"
 SPLIT="base/config.arm64_v8a.apk"
 WORK="work"
@@ -27,10 +30,22 @@ echo "zipalign : ${ZIPALIGN:-<missing>}"
 echo "apksigner: ${APKSIGNER:-<missing>}"
 echo ":: endgroup"
 
+# Prefer invoking apktool.jar directly so our heap setting is applied.
+APKTOOL_JAR=""
+for c in /usr/share/apktool/apktool.jar /usr/share/java/apktool.jar /usr/share/java/Apktool.jar; do
+  [ -f "$c" ] && APKTOOL_JAR="$c" && break
+done
+if [ -n "$APKTOOL_JAR" ]; then
+  APKTOOL="java $JAVA_OPTS -jar $APKTOOL_JAR"
+else
+  APKTOOL="apktool"
+fi
+echo "apktool cmd: $APKTOOL"
+
 echo ":: group::decode"
 rm -rf "$WORK" "$DIST"
 mkdir -p "$DIST"
-apktool d -f -o "$WORK" "$BASE"
+$APKTOOL d -f -o "$WORK" "$BASE"
 echo ":: endgroup"
 
 echo ":: group::patch"
@@ -38,7 +53,7 @@ python3 patches/apply.py "$WORK" "$SPLIT"
 echo ":: endgroup"
 
 echo ":: group::build"
-apktool b -o "$DIST/app-unsigned.apk" "$WORK"
+$APKTOOL b -o "$DIST/app-unsigned.apk" "$WORK"
 echo ":: endgroup"
 
 echo ":: group::sign"
