@@ -27,6 +27,9 @@ jobs:
           chmod +x jadx/bin/jadx
 
       - name: Decompile (Java + resources)
+        # jadx exits non-zero if some classes fail to decompile (expected on
+        # R8-obfuscated code); the output tree is still complete for the rest.
+        continue-on-error: true
         run: |
           JAVA_OPTS="-Xmx8g -XX:+UseSerialGC" \
             jadx/bin/jadx -d source --show-bad-code -j 4 \
@@ -39,14 +42,14 @@ jobs:
           cp -r source/sources out/java
           [ -d source/resources ] && cp -r source/resources out/resources || true
           cp source/resources/AndroidManifest.xml out/ 2>/dev/null || true
-          tar -czf invoiceapp-5.0.99-source.tar.gz -C out .
-          ls -lh invoiceapp-5.0.99-source.tar.gz
+          zip -qr invoiceapp-5.0.99-source.zip out
+          ls -lh invoiceapp-5.0.99-source.zip
 
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
           name: invoiceapp-source
-          path: invoiceapp-5.0.99-source.tar.gz
+          path: invoiceapp-5.0.99-source.zip
           if-no-files-found: error
 
       - name: Attach source to a rolling release
@@ -54,5 +57,5 @@ jobs:
         with:
           tag_name: source-latest
           name: "Invoice Manager 5.0.99 (decompiled source)"
-          files: invoiceapp-5.0.99-source.tar.gz
+          files: invoiceapp-5.0.99-source.zip
           fail_on_unmatched_files: true
