@@ -1,0 +1,6 @@
+work/
+dist/
+*.jks
+*.keystore
+debug.jks
+apktool*.jar
