@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 # apktool needs a generous heap on large apps (decode + smali + aapt2 link).
-export JAVA_OPTS="${JAVA_OPTS:--Xmx4g -XX:+UseSerialGC}"
+export JAVA_OPTS="${JAVA_OPTS:--Xmx6g -XX:+UseSerialGC}"
 
 BASE="base/com.invoiceapp.apk"
 SPLIT="base/config.arm64_v8a.apk"
@@ -31,15 +31,20 @@ echo "apksigner: ${APKSIGNER:-<missing>}"
 echo ":: endgroup"
 
 # Prefer invoking apktool.jar directly so our heap setting is applied.
+# (The distro `apktool` wrapper ignores JAVA_OPTS and runs its own default heap.)
 APKTOOL_JAR=""
 for c in /usr/share/apktool/apktool.jar /usr/share/java/apktool.jar /usr/share/java/Apktool.jar; do
   [ -f "$c" ] && APKTOOL_JAR="$c" && break
 done
-if [ -n "$APKTOOL_JAR" ]; then
-  APKTOOL="java $JAVA_OPTS -jar $APKTOOL_JAR"
-else
-  APKTOOL="apktool"
+if [ -z "$APKTOOL_JAR" ]; then
+  APKTOOL_JAR="$ROOT/apktool.jar"
+  if [ ! -f "$APKTOOL_JAR" ]; then
+    echo "downloading apktool jar..."
+    curl -sSL --retry 3 -o "$APKTOOL_JAR" \
+      "https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar"
+  fi
 fi
+APKTOOL="java $JAVA_OPTS -jar $APKTOOL_JAR"
 echo "apktool cmd: $APKTOOL"
 
 echo ":: group::decode"

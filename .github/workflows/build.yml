@@ -23,8 +23,9 @@ jobs:
 
       - name: Install apktool
         run: |
-          sudo apt-get update
-          sudo apt-get install -y apktool
+          curl -sSL --retry 3 -o apktool.jar \
+            "https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar"
+          java -jar apktool.jar --version
 
       - name: Decode, patch, rebuild, sign
         env:
