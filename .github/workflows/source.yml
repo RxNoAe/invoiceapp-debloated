@@ -1,0 +1,58 @@
+name: decompile-source
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  jadx:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Fetch jadx
+        run: |
+          curl -sSL --retry 3 -o jadx.zip \
+            "https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip"
+          unzip -q jadx.zip -d jadx
+          chmod +x jadx/bin/jadx
+
+      - name: Decompile (Java + resources)
+        run: |
+          JAVA_OPTS="-Xmx8g -XX:+UseSerialGC" \
+            jadx/bin/jadx -d source --show-bad-code -j 4 \
+            base/com.invoiceapp.apk
+
+      - name: Package source
+        run: |
+          # ship the Java tree, resources and the decoded manifest together
+          mkdir -p out
+          cp -r source/sources out/java
+          [ -d source/resources ] && cp -r source/resources out/resources || true
+          cp source/resources/AndroidManifest.xml out/ 2>/dev/null || true
+          tar -czf invoiceapp-5.0.99-source.tar.gz -C out .
+          ls -lh invoiceapp-5.0.99-source.tar.gz
+
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: invoiceapp-source
+          path: invoiceapp-5.0.99-source.tar.gz
+          if-no-files-found: error
+
+      - name: Attach source to a rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: source-latest
+          name: "Invoice Manager 5.0.99 (decompiled source)"
+          files: invoiceapp-5.0.99-source.tar.gz
+          fail_on_unmatched_files: true
